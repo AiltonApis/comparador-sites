@@ -6,6 +6,7 @@
   "type": "module",
   "description": "Comparador visual de sites",
   "scripts": {
+    "dev": "node index.js",
     "start": "node index.js",
     "postinstall": "npx playwright install chromium"
   },
