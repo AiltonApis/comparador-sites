@@ -12,6 +12,8 @@ const app = express();
 app.use(express.json());
 app.use(express.static("public"));
 
+const PORT = process.env.PORT || 3000;
+
 // 🎯 FUNÇÃO DE CRAWLING (que estava faltando)
 // 🎯 FUNÇÃO DE CRAWLING MELHORADA
 async function crawlSite(browser, baseUrl, maxPages = 50) {
@@ -204,22 +206,20 @@ function compareImages(img1Path, img2Path) {
     };
 }
 
-// 🎯 HEALTH CHECK - Rota raiz para Railway
-app.get('/', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'Comparador de Sites Online',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// ... (seu código existente)
-
 // 🎯 HEALTH CHECK para Railway
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'healthy',
     service: 'comparador-sites',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 🎯 Rota raiz também
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Comparador de Sites Online',
     timestamp: new Date().toISOString()
   });
 });
@@ -405,4 +405,6 @@ app.post("/compare-full-site", async (req, res) => {
     }
 });
 
-app.listen(3000, () => console.log("🚀 Servidor rodando em http://localhost:3000"));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+});
