@@ -411,6 +411,63 @@
                 <div id="fullSiteResults"></div>
             </div>
         </div>
+
+        <div class="panel" style="display: none">
+            <h2>🐛 Debug Crawling</h2>
+
+            <label>URL para testar crawling:</label>
+            <input id="debugUrl" value="https://anuario.todospelaeducacao.org.br/2025/">
+
+            <label>Máximo de Páginas:</label>
+            <input id="debugMaxPages" type="number" value="5" min="1" max="20">
+
+            <button id="debugCrawlBtn">🐛 Testar Crawling</button>
+
+            <div id="debugResult" style="display: none; margin-top: 1rem;">
+                <div id="debugInfo"></div>
+                <pre id="debugPages"
+                    style="background: #f5f5f5; padding: 1rem; border-radius: 5px; overflow: auto; max-height: 300px;"></pre>
+            </div>
+        </div>
+
+        <script>
+            // Debug crawling
+            document.getElementById("debugCrawlBtn").addEventListener("click", async () => {
+                const debugUrl = document.getElementById("debugUrl").value;
+                const debugMaxPages = document.getElementById("debugMaxPages").value;
+
+                const debugInfo = document.getElementById("debugInfo");
+                const debugPages = document.getElementById("debugPages");
+                const debugResult = document.getElementById("debugResult");
+
+                debugInfo.textContent = "🔍 Testando crawling...";
+                debugResult.style.display = "block";
+
+                try {
+                    const res = await fetch("/debug-crawl", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            url: debugUrl,
+                            maxPages: parseInt(debugMaxPages)
+                        })
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        debugInfo.innerHTML = `<span style="color: green;">✅ ${data.debug}</span>`;
+                        debugPages.textContent = data.pages.join('\n');
+                    } else {
+                        debugInfo.innerHTML = `<span style="color: red;">❌ Erro: ${data.error}</span>`;
+                    }
+                } catch (err) {
+                    debugInfo.innerHTML = `<span style="color: red;">❌ Erro: ${err.message}</span>`;
+                }
+            });
+        </script>
     </div>
 
     <script>

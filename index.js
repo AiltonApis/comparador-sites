@@ -10,6 +10,7 @@ app.use(express.json());
 app.use(express.static("public"));
 
 // 🎯 FUNÇÃO DE CRAWLING
+// 🎯 FUNÇÃO DE CRAWLING CORRIGIDA COM DEBUG
 async function crawlSite(browser, baseUrl, maxPages = 50) {
     const visited = new Set();
     const toVisit = [baseUrl];
@@ -21,13 +22,18 @@ async function crawlSite(browser, baseUrl, maxPages = 50) {
 
     console.log(`🔍 Iniciando crawling em: ${baseUrl}`);
 
-    while (toVisit.length > 0 && allPages.size < maxPages) {
+    let pageCount = 0;
+
+    while (toVisit.length > 0 && pageCount < maxPages) {
         const currentUrl = toVisit.shift();
 
-        if (visited.has(currentUrl)) continue;
+        if (visited.has(currentUrl)) {
+            console.log(`⏭️  Já visitado: ${currentUrl}`);
+            continue;
+        }
 
-        console.log(`🌐 Crawling: ${currentUrl}`);
-
+        console.log(`🌐 [${pageCount + 1}/${maxPages}] Crawling: ${currentUrl}`);
+        
         try {
             await page.goto(currentUrl, {
                 waitUntil: "domcontentloaded",
@@ -36,58 +42,117 @@ async function crawlSite(browser, baseUrl, maxPages = 50) {
 
             await page.waitForTimeout(3000);
             visited.add(currentUrl);
+            pageCount++;
 
-            const links = await page.$$eval('a[href]', (anchors, baseUrl) => {
-                return anchors
-                    .map(a => a.href)
-                    .filter(href => {
-                        try {
-                            if (!href) return false;
-                            const baseDomain = new URL(baseUrl).hostname;
-                            const linkUrl = new URL(href, baseUrl);
-                            return linkUrl.hostname === baseDomain;
-                        } catch {
-                            return false;
+            // 🔥 DEBUG: Verifica se a página carregou
+            const pageTitle = await page.title();
+            console.log(`   📄 Título: ${pageTitle}`);
+            console.log(`   🔗 URL atual: ${page.url()}`);
+
+            // 🔥 ESTRATÉGIA MAIS AGRESSIVA: Tenta múltiplos métodos
+            let links = [];
+
+            // Método 1: Links simples
+            try {
+                links = await page.$$eval('a[href]', (anchors, baseUrl) => {
+                    return anchors
+                        .map(a => a.href)
+                        .filter(href => {
+                            try {
+                                if (!href) return false;
+                                // Converte URL relativa para absoluta
+                                const absoluteUrl = new URL(href, window.location.href).href;
+                                const baseDomain = new URL(baseUrl).hostname;
+                                const linkDomain = new URL(absoluteUrl).hostname;
+                                
+                                return linkDomain === baseDomain;
+                            } catch {
+                                return false;
+                            }
+                        })
+                        .map(href => new URL(href, window.location.href).href)
+                        .filter(href => 
+                            !href.includes('#') && 
+                            !href.includes('mailto:') && 
+                            !href.includes('tel:') &&
+                            !href.match(/\.(pdf|doc|docx|xls|xlsx|zip|rar|mp3|mp4|jpg|jpeg|png|gif)$/i)
+                        );
+                }, baseUrl);
+            } catch (err) {
+                console.log(`   ⚠️  Método 1 falhou: ${err.message}`);
+            }
+
+            // Se não encontrou links, tenta método alternativo
+            if (links.length === 0) {
+                console.log(`   🔄 Tentando método alternativo...`);
+                try {
+                    links = await page.evaluate((baseUrl) => {
+                        const allLinks = [];
+                        const anchors = document.querySelectorAll('a[href]');
+                        
+                        for (const anchor of anchors) {
+                            try {
+                                const href = anchor.href;
+                                if (!href) continue;
+                                
+                                const absoluteUrl = new URL(href, window.location.href).href;
+                                const baseDomain = new URL(baseUrl).hostname;
+                                const linkDomain = new URL(absoluteUrl).hostname;
+                                
+                                if (linkDomain === baseDomain && 
+                                    !href.includes('#') && 
+                                    !href.includes('mailto:') && 
+                                    !href.includes('tel:') &&
+                                    !href.match(/\.(pdf|doc|docx|xls|xlsx|zip|rar|mp3|mp4|jpg|jpeg|png|gif)$/i)) {
+                                    allLinks.push(absoluteUrl);
+                                }
+                            } catch (e) {
+                                // Ignora links inválidos
+                            }
                         }
-                    })
-                    .map(href => {
-                        try {
-                            return new URL(href, baseUrl).href;
-                        } catch {
-                            return null;
-                        }
-                    })
-                    .filter(href => href !== null &&
-                        !href.includes('#') &&
-                        !href.includes('mailto:') &&
-                        !href.includes('tel:') &&
-                        !href.match(/\.(pdf|doc|docx|xls|xlsx|zip|rar|mp3|mp4)$/i))
-                    .slice(0, 50);
-            }, baseUrl);
-
-            console.log(`📎 Encontrados ${links.length} links em ${currentUrl}`);
-
-            for (const link of links) {
-                const cleanLink = link.split('#')[0];
-                if (!visited.has(cleanLink) &&
-                    !toVisit.includes(cleanLink) &&
-                    allPages.size < maxPages) {
-                    toVisit.push(cleanLink);
-                    allPages.add(cleanLink);
+                        return [...new Set(allLinks)]; // Remove duplicatas
+                    }, baseUrl);
+                } catch (err) {
+                    console.log(`   ⚠️  Método 2 falhou: ${err.message}`);
                 }
             }
 
+            console.log(`   📎 Encontrados ${links.length} links em ${currentUrl}`);
+
+            // 🔥 DEBUG: Mostra os primeiros links encontrados
+            if (links.length > 0) {
+                console.log(`   🔗 Primeiros links:`, links.slice(0, 3));
+            }
+
+            // Adiciona novos links
+            let newLinksCount = 0;
+            for (const link of links) {
+                const cleanLink = link.split('#')[0].split('?')[0]; // Remove anchors e query params
+                if (!visited.has(cleanLink) && 
+                    !toVisit.includes(cleanLink) && 
+                    pageCount + newLinksCount < maxPages) {
+                    toVisit.push(cleanLink);
+                    allPages.add(cleanLink);
+                    newLinksCount++;
+                }
+            }
+
+            console.log(`   ➕ ${newLinksCount} novos links adicionados`);
+
         } catch (err) {
-            console.log(`⚠️  Erro ao crawlar ${currentUrl}:`, err.message);
+            console.log(`❌ Erro ao crawlar ${currentUrl}:`, err.message);
             visited.add(currentUrl);
         }
 
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(2000);
     }
 
     await page.close();
+    
     const pagesArray = Array.from(allPages);
     console.log(`✅ Crawling finalizado: ${pagesArray.length} páginas encontradas`);
+    console.log(`📋 Páginas encontradas:`, pagesArray);
+    
     return pagesArray;
 }
 
@@ -403,6 +468,38 @@ app.post("/compare-full-site", async (req, res) => {
         res.status(500).json({
             success: false,
             error: err.message
+        });
+    }
+});
+
+// 🎯 ROTA DE DEBUG CRAWLING
+app.post("/debug-crawl", async (req, res) => {
+    const { url, maxPages = 5 } = req.body;
+
+    try {
+        const browser = await chromium.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        });
+
+        console.log("🐛 DEBUG: Iniciando crawling...");
+        const pages = await crawlSite(browser, url, maxPages);
+        
+        await browser.close();
+
+        res.json({
+            success: true,
+            url,
+            totalPages: pages.length,
+            pages: pages,
+            debug: `Encontradas ${pages.length} páginas em ${url}`
+        });
+
+    } catch (err) {
+        console.error("❌ Erro no debug:", err);
+        res.status(500).json({ 
+            success: false, 
+            error: err.message 
         });
     }
 });
