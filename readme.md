@@ -17,4 +17,4 @@ Compara visualmente duas versões de um site e detecta diferenças.
 
 ## 📦 Deploy
 
-[![Deploy on Railway]([https://railway.app/button.svg)](https://railway.app/template/whatever](https://comparador-sites-production.up.railway.app/))
+[![Deploy on Railway](https://railway.app/button.svg)](https://comparador-sites-production.up.railway.app/)
