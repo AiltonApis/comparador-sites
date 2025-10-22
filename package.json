@@ -6,16 +6,23 @@
   "type": "module",
   "description": "Comparador visual de sites",
   "scripts": {
-    "dev": "node index.js",
+    "dev": "nodemon index.js",
     "start": "node index.js",
     "postinstall": "npx playwright install chromium"
   },
   "dependencies": {
     "express": "^5.1.0",
+    "nodemon": "^3.1.10",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.56.1",
-    "pngjs": "^7.0.0"
+    "pngjs": "^7.0.0",
+    "sharp": "^0.34.4"
   },
-  "keywords": ["comparador", "sites", "visual", "screenshot"],
+  "keywords": [
+    "comparador",
+    "sites",
+    "visual",
+    "screenshot"
+  ],
   "author": "Apis Design"
 }

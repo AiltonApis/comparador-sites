@@ -1,21 +1,27 @@
 import express from "express";
-import { chromium } from "playwright";
+import {
+    chromium
+} from "playwright";
 import pixelmatch from "pixelmatch";
-import { PNG } from "pngjs";
-import sharp from "sharp";
+import {
+    PNG
+} from "pngjs";
 import fs from "fs";
 
 const app = express();
 app.use(express.json());
 app.use(express.static("public"));
 
-// 🎯 FUNÇÃO DE CRAWLING
+// 🎯 FUNÇÃO DE CRAWLING (que estava faltando)
+// 🎯 FUNÇÃO DE CRAWLING MELHORADA
 async function crawlSite(browser, baseUrl, maxPages = 50) {
     const visited = new Set();
     const toVisit = [baseUrl];
     const allPages = new Set([baseUrl]);
 
     const page = await browser.newPage();
+
+    // Configurações mais permissivas
     await page.setDefaultTimeout(60000);
     await page.setDefaultNavigationTimeout(60000);
 
@@ -37,6 +43,7 @@ async function crawlSite(browser, baseUrl, maxPages = 50) {
             await page.waitForTimeout(3000);
             visited.add(currentUrl);
 
+            // Estratégia SIMPLES que FUNCIONA
             const links = await page.$$eval('a[href]', (anchors, baseUrl) => {
                 return anchors
                     .map(a => a.href)
@@ -67,6 +74,7 @@ async function crawlSite(browser, baseUrl, maxPages = 50) {
 
             console.log(`📎 Encontrados ${links.length} links em ${currentUrl}`);
 
+            // Adiciona novos links
             for (const link of links) {
                 const cleanLink = link.split('#')[0];
                 if (!visited.has(cleanLink) &&
@@ -86,12 +94,14 @@ async function crawlSite(browser, baseUrl, maxPages = 50) {
     }
 
     await page.close();
+
     const pagesArray = Array.from(allPages);
     console.log(`✅ Crawling finalizado: ${pagesArray.length} páginas encontradas`);
+
     return pagesArray;
 }
 
-// 🎯 FUNÇÃO DE SCREENSHOT ROBUSTA
+// 🎯 FUNÇÃO DE SCREENSHOT ROBUSTA (que estava faltando)
 async function robustScreenshot(browser, url, filename) {
     const page = await browser.newPage();
 
@@ -133,152 +143,137 @@ async function robustScreenshot(browser, url, filename) {
     }
 }
 
-// 🎯 FUNÇÃO DE COMPARAÇÃO COM SHARP + PIXELMATCH (MODERNA E CONFIÁVEL)
-async function compareImages(img1Path, img2Path) {
-    try {
-        // Lê e processa as imagens com Sharp
-        const image1 = await sharp(img1Path).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-        const image2 = await sharp(img2Path).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+// 🎯 FUNÇÃO DE COMPARAÇÃO DE IMAGENS
+function compareImages(img1Path, img2Path) {
+    const img1 = PNG.sync.read(fs.readFileSync(img1Path));
+    const img2 = PNG.sync.read(fs.readFileSync(img2Path));
 
-        const { width: width1, height: height1 } = image1.info;
-        const { width: width2, height: height2 } = image2.info;
+    const minWidth = Math.min(img1.width, img2.width);
+    const minHeight = Math.min(img1.height, img2.height);
 
-        // Usa o menor tamanho entre as duas imagens
-        const width = Math.min(width1, width2);
-        const height = Math.min(height1, height2);
+    const resizedImg1 = new PNG({
+        width: minWidth,
+        height: minHeight
+    });
+    const resizedImg2 = new PNG({
+        width: minWidth,
+        height: minHeight
+    });
 
-        // Redimensiona ambas para o mesmo tamanho
-        const [buffer1, buffer2] = await Promise.all([
-            sharp(img1Path)
-                .resize(width, height)
-                .ensureAlpha()
-                .raw()
-                .toBuffer(),
-            sharp(img2Path)
-                .resize(width, height)
-                .ensureAlpha()
-                .raw()
-                .toBuffer()
-        ]);
+    for (let y = 0; y < minHeight; y++) {
+        for (let x = 0; x < minWidth; x++) {
+            const idx1 = (img1.width * y + x) << 2;
+            const idx2 = (img2.width * y + x) << 2;
+            const idxOut = (minWidth * y + x) << 2;
 
-        // Cria imagem de diff
-        const diff = new PNG({ width, height });
-        
-        // 🔥 CONFIGURAÇÕES INTELIGENTES
-        const numDiffPixels = pixelmatch(
-            buffer1, 
-            buffer2, 
-            diff.data, 
-            width, 
-            height, 
-            {
-                threshold: 0.05,           // Threshold mais baixo para mais sensibilidade
-                includeAA: false,          // Ignora anti-aliasing
-                alpha: 0.3,                // Considera transparência
-                aaColor: [255, 255, 0, 255], // Amarelo para anti-aliasing
-                diffColor: [255, 0, 0, 255]  // Vermelho para diferenças reais
+            if (x < img1.width && y < img1.height) {
+                resizedImg1.data[idxOut] = img1.data[idx1];
+                resizedImg1.data[idxOut + 1] = img1.data[idx1 + 1];
+                resizedImg1.data[idxOut + 2] = img1.data[idx1 + 2];
+                resizedImg1.data[idxOut + 3] = img1.data[idx1 + 3];
             }
-        );
 
-        const timestamp = Date.now();
-        const diffFilename = `diff-${timestamp}.png`;
-        const diffPath = `public/${diffFilename}`;
-
-        // Salva a imagem diff
-        await sharp(diff.data, {
-            raw: { width, height, channels: 4 }
-        }).png().toFile(diffPath);
-
-        const totalPixels = width * height;
-        const diffPercentage = (numDiffPixels / totalPixels) * 100;
-        
-        // 🎯 CLASSIFICAÇÃO INTELIGENTE DAS DIFERENÇAS
-        const getDifferenceLevel = () => {
-            if (diffPercentage < 0.1) return 'insignificante';
-            if (diffPercentage < 1) return 'pequena';
-            if (diffPercentage < 5) return 'moderada';
-            return 'significante';
-        };
-
-        return {
-            diff: PNG.sync.read(fs.readFileSync(diffPath)),
-            numDiffPixels,
-            diffPercentage: Math.round(diffPercentage * 100) / 100, // 2 casas decimais
-            isSignificant: diffPercentage > 0.1, // > 0.1% é significativo
-            differenceLevel: getDifferenceLevel(),
-            diffUrl: `/${diffFilename}`,
-            stats: {
-                totalPixels,
-                diffPixels: numDiffPixels,
-                similarity: Math.round(((totalPixels - numDiffPixels) / totalPixels) * 100 * 100) / 100,
-                width,
-                height
+            if (x < img2.width && y < img2.height) {
+                resizedImg2.data[idxOut] = img2.data[idx2];
+                resizedImg2.data[idxOut + 1] = img2.data[idx2 + 1];
+                resizedImg2.data[idxOut + 2] = img2.data[idx2 + 2];
+                resizedImg2.data[idxOut + 3] = img2.data[idx2 + 3];
             }
-        };
-
-    } catch (error) {
-        throw new Error(`Erro na comparação de imagens: ${error.message}`);
+        }
     }
+
+    const diff = new PNG({
+        width: minWidth,
+        height: minHeight
+    });
+    const numDiffPixels = pixelmatch(
+        resizedImg1.data,
+        resizedImg2.data,
+        diff.data,
+        minWidth,
+        minHeight, {
+            threshold: 0.1
+        }
+    );
+
+    return {
+        diff,
+        numDiffPixels,
+        width: minWidth,
+        height: minHeight
+    };
 }
 
 // 🎯 HEALTH CHECK para Railway
 app.get('/health', (req, res) => {
-    res.status(200).json({ 
-        status: 'healthy',
-        service: 'comparador-sites',
-        timestamp: new Date().toISOString()
-    });
+  res.status(200).json({ 
+    status: 'healthy',
+    service: 'comparador-sites',
+    timestamp: new Date().toISOString()
+  });
 });
 
-// 🎯 Rota raiz
+// 🎯 Rota raiz também
 app.get('/', (req, res) => {
-    res.json({ 
-        status: 'OK', 
-        message: 'Comparador de Sites Online',
-        timestamp: new Date().toISOString()
-    });
+  res.json({ 
+    status: 'OK', 
+    message: 'Comparador de Sites Online',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // 🎯 ROTA DE COMPARAÇÃO SIMPLES
 app.post("/compare", async (req, res) => {
     // Limpa imagens antigas
     fs.readdirSync("public").forEach(file => {
-        if (file.startsWith("site1.png") || file.startsWith("site2.png") || file.startsWith("diff-")) {
-            try {
-                fs.unlinkSync(`public/${file}`);
-            } catch (e) {
-                console.log(`⚠️  Não foi possível deletar ${file}: ${e.message}`);
-            }
+        if (file.endsWith(".png")) {
+            fs.unlinkSync(`public/${file}`);
         }
     });
 
-    const { url1, url2, width = 1280, height = 800 } = req.body;
+
+    const {
+        url1,
+        url2,
+        width = 1280,
+        height = 800
+    } = req.body;
 
     try {
         const browser = await chromium.launch();
-        const page = await browser.newPage({ viewport: { width, height } });
+        const page = await browser.newPage({
+            viewport: {
+                width,
+                height
+            }
+        });
 
         async function screenshot(url, filename) {
-            await page.goto(url, { waitUntil: "networkidle", timeout: 90000 });
-            await page.screenshot({ path: filename, fullPage: true });
+            await page.goto(url, {
+                waitUntil: "networkidle",
+                timeout: 90000
+            });
+            await page.screenshot({
+                path: filename,
+                fullPage: true
+            });
         }
 
         await screenshot(url1, "public/site1.png");
         await screenshot(url2, "public/site2.png");
 
-        const result = await compareImages("public/site1.png", "public/site2.png");
-        
+        const {
+            diff,
+            numDiffPixels
+        } = compareImages("public/site1.png", "public/site2.png");
+
+        fs.writeFileSync("public/diff.png", PNG.sync.write(diff));
         await browser.close();
 
         res.json({
             success: true,
-            diffUrl: result.diffUrl,
-            numDiffPixels: result.numDiffPixels,
-            diffPercentage: result.diffPercentage,
-            isSignificant: result.isSignificant,
-            differenceLevel: result.differenceLevel,
-            similarity: result.stats.similarity,
-            stats: result.stats
+            diffUrl: "/diff.png",
+            numDiffPixels
         });
     } catch (err) {
         console.error(err);
@@ -289,20 +284,19 @@ app.post("/compare", async (req, res) => {
     }
 });
 
-// 🎯 ROTA DE CRAWLING COMPLETO
+// 🎯 ROTA DE CRAWLING COMPLETO (CORRIGIDA)
 app.post("/compare-full-site", async (req, res) => {
     // Limpa imagens antigas
     fs.readdirSync("public").forEach(file => {
-        if (file.startsWith("site1-batch-") || file.startsWith("site2-batch-") || file.startsWith("diff-batch-") || file.startsWith("diff-")) {
-            try {
-                fs.unlinkSync(`public/${file}`);
-            } catch (e) {
-                console.log(`⚠️  Não foi possível deletar ${file}: ${e.message}`);
-            }
+        if (file.endsWith(".png")) {
+            fs.unlinkSync(`public/${file}`);
         }
     });
-
-    const { baseUrl1, baseUrl2, maxPages = 30 } = req.body;
+    const {
+        baseUrl1,
+        baseUrl2,
+        maxPages = 30
+    } = req.body;
 
     try {
         const browser = await chromium.launch({
@@ -335,19 +329,21 @@ app.post("/compare-full-site", async (req, res) => {
 
                 if (success1 && success2) {
                     try {
-                        const result = await compareImages(
+                        const {
+                            diff,
+                            numDiffPixels
+                        } = compareImages(
                             `public/site1-batch-${index}.png`,
                             `public/site2-batch-${index}.png`
                         );
 
+                        const diffFilename = `diff-batch-${index}.png`;
+                        fs.writeFileSync(`public/${diffFilename}`, PNG.sync.write(diff));
+
                         results.push({
                             name: `Página ${index + 1}: ${new URL(path).pathname || '/'}`,
-                            diffUrl: result.diffUrl,
-                            numDiffPixels: result.numDiffPixels,
-                            diffPercentage: result.diffPercentage,
-                            isSignificant: result.isSignificant,
-                            differenceLevel: result.differenceLevel,
-                            similarity: result.stats.similarity,
+                            diffUrl: `/${diffFilename}`,
+                            numDiffPixels,
                             url1,
                             url2,
                             path: new URL(path).pathname,
@@ -407,5 +403,4 @@ app.post("/compare-full-site", async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
+app.listen(3000, () => console.log("🚀 Servidor rodando em http://localhost:3000"));

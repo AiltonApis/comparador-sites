@@ -271,11 +271,102 @@
         html {
             scroll-behavior: smooth;
         }
+
+        /* 🔥 LIGHTBOX COM ZOOM */
+        .lightbox {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            cursor: zoom-out;
+        }
+
+        .lightbox-img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border: 3px solid white;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease;
+            cursor: zoom-in;
+        }
+
+        .lightbox.zoomed .lightbox-img {
+            cursor: grab;
+        }
+
+        .lightbox.zoomed .lightbox-img:active {
+            cursor: grabbing;
+        }
+
+        .lightbox-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .lightbox-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: background 0.3s ease;
+        }
+
+        .lightbox-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .zoom-info {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        /* Imagens clicáveis */
+        .diff-image {
+            cursor: zoom-in;
+            transition: transform 0.2s ease;
+        }
+
+        .diff-image:hover {
+            transform: scale(1.02);
+        }
     </style>
 </head>
 
 <body>
     <h1>Comparador Visual de Sites</h1>
+
+    <!-- 🔥 LIGHTBOX PARA ZOOM -->
+    <div id="lightbox" class="lightbox">
+        <div class="lightbox-controls">
+            <button class="lightbox-btn" id="zoomIn">➕</button>
+            <button class="lightbox-btn" id="zoomOut">➖</button>
+            <button class="lightbox-btn" id="resetZoom">↺</button>
+            <button class="lightbox-btn" id="closeLightbox">✕</button>
+        </div>
+        <img class="lightbox-img" id="lightboxImg" alt="Imagem ampliada">
+        <div class="zoom-info" id="zoomInfo">100%</div>
+    </div>
 
     <div class="container">
         <!-- Comparação Simples -->
@@ -509,6 +600,170 @@
             if (fullSiteController) {
                 fullSiteController.abort();
             }
+        });
+
+        // 🔥 SISTEMA DE LIGHTBOX COM ZOOM
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightboxImg');
+        const closeLightbox = document.getElementById('closeLightbox');
+        const zoomInBtn = document.getElementById('zoomIn');
+        const zoomOutBtn = document.getElementById('zoomOut');
+        const resetZoomBtn = document.getElementById('resetZoom');
+        const zoomInfo = document.getElementById('zoomInfo');
+
+        let currentScale = 1;
+        let isDragging = false;
+        let startX, startY, scrollLeft, scrollTop;
+
+        // Abrir lightbox ao clicar em qualquer imagem diff
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('diff-image')) {
+                openLightbox(e.target.src);
+            }
+        });
+
+        // Função para abrir lightbox
+        function openLightbox(imgSrc) {
+            lightboxImg.src = imgSrc;
+            lightbox.style.display = 'flex';
+            currentScale = 1;
+            updateZoom();
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Fechar lightbox
+        closeLightbox.addEventListener('click', closeLightboxFunc);
+        lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox) {
+                closeLightboxFunc();
+            }
+        });
+
+        function closeLightboxFunc() {
+            lightbox.style.display = 'none';
+            lightbox.classList.remove('zoomed');
+            document.body.style.overflow = 'auto';
+        }
+
+        // Controles de zoom
+        zoomInBtn.addEventListener('click', () => {
+            currentScale = Math.min(currentScale + 0.25, 3);
+            updateZoom();
+        });
+
+        zoomOutBtn.addEventListener('click', () => {
+            currentScale = Math.max(currentScale - 0.25, 0.5);
+            updateZoom();
+        });
+
+        resetZoomBtn.addEventListener('click', () => {
+            currentScale = 1;
+            updateZoom();
+        });
+
+        // Atualizar zoom
+        function updateZoom() {
+            lightboxImg.style.transform = `scale(${currentScale})`;
+            zoomInfo.textContent = `${Math.round(currentScale * 100)}%`;
+
+            if (currentScale > 1) {
+                lightbox.classList.add('zoomed');
+                enableDrag();
+            } else {
+                lightbox.classList.remove('zoomed');
+                disableDrag();
+            }
+        }
+
+        // Sistema de arrastar para imagens grandes
+        function enableDrag() {
+            lightboxImg.style.cursor = 'grab';
+
+            lightboxImg.addEventListener('mousedown', startDrag);
+            lightboxImg.addEventListener('touchstart', startDragTouch);
+        }
+
+        function disableDrag() {
+            lightboxImg.style.cursor = 'zoom-in';
+
+            lightboxImg.removeEventListener('mousedown', startDrag);
+            lightboxImg.removeEventListener('touchstart', startDragTouch);
+        }
+
+        function startDrag(e) {
+            isDragging = true;
+            startX = e.pageX - lightboxImg.offsetLeft;
+            startY = e.pageY - lightboxImg.offsetTop;
+            scrollLeft = lightbox.scrollLeft;
+            scrollTop = lightbox.scrollTop;
+
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDrag);
+            e.preventDefault();
+        }
+
+        function startDragTouch(e) {
+            isDragging = true;
+            const touch = e.touches[0];
+            startX = touch.pageX - lightboxImg.offsetLeft;
+            startY = touch.pageY - lightboxImg.offsetTop;
+            scrollLeft = lightbox.scrollLeft;
+            scrollTop = lightbox.scrollTop;
+
+            document.addEventListener('touchmove', dragTouch);
+            document.addEventListener('touchend', stopDrag);
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            const x = e.pageX - lightboxImg.offsetLeft;
+            const y = e.pageY - lightboxImg.offsetTop;
+            const walkX = (x - startX) * 2;
+            const walkY = (y - startY) * 2;
+            lightbox.scrollLeft = scrollLeft - walkX;
+            lightbox.scrollTop = scrollTop - walkY;
+        }
+
+        function dragTouch(e) {
+            if (!isDragging) return;
+            const touch = e.touches[0];
+            const x = touch.pageX - lightboxImg.offsetLeft;
+            const y = touch.pageY - lightboxImg.offsetTop;
+            const walkX = (x - startX) * 2;
+            const walkY = (y - startY) * 2;
+            lightbox.scrollLeft = scrollLeft - walkX;
+            lightbox.scrollTop = scrollTop - walkY;
+        }
+
+        function stopDrag() {
+            isDragging = false;
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('touchmove', dragTouch);
+            document.removeEventListener('mouseup', stopDrag);
+            document.removeEventListener('touchend', stopDrag);
+        }
+
+        // Fechar com ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && lightbox.style.display === 'flex') {
+                closeLightboxFunc();
+            }
+        });
+
+        // Zoom com roda do mouse na lightbox
+        lightbox.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (e.deltaY < 0) {
+                // Scroll up - zoom in
+                currentScale = Math.min(currentScale + 0.1, 3);
+            } else {
+                // Scroll down - zoom out
+                currentScale = Math.max(currentScale - 0.1, 0.5);
+            }
+            updateZoom();
+        }, {
+            passive: false
         });
     </script>
 </body>
