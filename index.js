@@ -12,6 +12,8 @@ const app = express();
 app.use(express.json());
 app.use(express.static("public"));
 
+const PORT = process.env.PORT || 3000;
+
 // 🎯 FUNÇÃO DE CRAWLING (que estava faltando)
 // 🎯 FUNÇÃO DE CRAWLING MELHORADA
 async function crawlSite(browser, baseUrl, maxPages = 50) {
@@ -403,4 +405,4 @@ app.post("/compare-full-site", async (req, res) => {
     }
 });
 
-app.listen(3000, () => console.log("🚀 Servidor rodando em http://localhost:3000"));
+app.listen(PORT, () => console.log(`🚀 Servidor rodando em ${PORT}`));

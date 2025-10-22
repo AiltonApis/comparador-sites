@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -40,7 +41,7 @@
             background: white;
             padding: 2rem;
             border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(10px);
         }
 
@@ -60,7 +61,9 @@
             color: #2c3e50;
         }
 
-        input, button, textarea {
+        input,
+        button,
+        textarea {
             width: 100%;
             padding: 0.8rem 1rem;
             margin-top: 0.5rem;
@@ -91,7 +94,7 @@
         button:hover {
             background: linear-gradient(135deg, #2980b9, #1f618d);
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
 
         button:active {
@@ -107,7 +110,8 @@
         }
 
         /* Resultados */
-        #result, #fullSiteResult {
+        #result,
+        #fullSiteResult {
             margin-top: 2rem;
             display: none;
         }
@@ -123,7 +127,7 @@
 
         .result-item:hover {
             border-color: #3498db;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
         }
 
         .result-item h4 {
@@ -151,7 +155,7 @@
             border: 2px solid #bdc3c7;
             border-radius: 8px;
             margin-top: 1rem;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
         }
 
         /* Progress bar */
@@ -162,7 +166,7 @@
             border-radius: 10px;
             margin: 1.5rem 0;
             overflow: hidden;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .progress-bar {
@@ -180,16 +184,14 @@
             left: 0;
             bottom: 0;
             right: 0;
-            background-image: linear-gradient(
-                45deg,
-                rgba(255, 255, 255, 0.15) 25%,
-                transparent 25%,
-                transparent 50%,
-                rgba(255, 255, 255, 0.15) 50%,
-                rgba(255, 255, 255, 0.15) 75%,
-                transparent 75%,
-                transparent
-            );
+            background-image: linear-gradient(45deg,
+                    rgba(255, 255, 255, 0.15) 25%,
+                    transparent 25%,
+                    transparent 50%,
+                    rgba(255, 255, 255, 0.15) 50%,
+                    rgba(255, 255, 255, 0.15) 75%,
+                    transparent 75%,
+                    transparent);
             background-size: 1rem 1rem;
             animation: progress-animation 1s linear infinite;
         }
@@ -198,6 +200,7 @@
             0% {
                 background-position: 0 0;
             }
+
             100% {
                 background-position: 1rem 0;
             }
@@ -220,7 +223,8 @@
         }
 
         /* Informações */
-        #fullSiteInfo, #info {
+        #fullSiteInfo,
+        #info {
             background: #e8f4fc;
             padding: 1rem;
             border-radius: 8px;
@@ -234,7 +238,7 @@
             color: white;
             margin-bottom: 2rem;
             font-size: 2.5rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         h1::before {
@@ -254,8 +258,13 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         /* Scroll suave */
@@ -267,7 +276,7 @@
 
 <body>
     <h1>Comparador Visual de Sites</h1>
-    
+
     <div class="container">
         <!-- Comparação Simples -->
         <div class="panel">
@@ -279,6 +288,7 @@
             <input id="url2" value="https://apisdesign.com.br/a/anuario2025/v08/">
 
             <button id="compareBtn">🔍 Comparar Páginas</button>
+            <button id="cancelCompareBtn" class="secondary" style="display: none;">⏹️ Cancelar Comparação</button>
 
             <div id="result">
                 <div id="info"></div>
@@ -300,6 +310,7 @@
             <input id="maxPages" type="number" value="20" min="0" max="100">
 
             <button id="compareFullSiteBtn">🕷️ Crawlear e Comparar TODO o Site</button>
+            <button id="cancelFullSiteBtn" class="secondary" style="display: none;">⏹️ Cancelar Crawling</button>
 
             <div id="fullSiteResult">
                 <div class="progress">
@@ -312,6 +323,10 @@
     </div>
 
     <script>
+        // 🔥 CONTROLLERS para cancelamento
+        let compareController = null;
+        let fullSiteController = null;
+
         // Comparação única
         document.getElementById("compareBtn").addEventListener("click", async () => {
             const url1 = document.getElementById("url1").value;
@@ -319,27 +334,57 @@
             const info = document.getElementById("info");
             const diffImage = document.getElementById("diffImage");
             const result = document.getElementById("result");
+            const compareBtn = document.getElementById("compareBtn");
+            const cancelBtn = document.getElementById("cancelCompareBtn");
 
+            // 🔥 Cria novo AbortController
+            compareController = new AbortController();
+
+            compareBtn.disabled = true;
+            cancelBtn.style.display = "block";
             info.innerHTML = '<div class="loading"></div> Comparando... isso pode levar alguns segundos ⏳';
             result.style.display = "block";
 
             try {
                 const res = await fetch("/compare", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ url1, url2 })
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        url1,
+                        url2
+                    }),
+                    signal: compareController.signal // 🔥 Conecta o abort signal
                 });
 
                 const data = await res.json();
 
                 if (data.success) {
-                    info.innerHTML = `<span class="status-success">✅ Diferenças detectadas: ${data.numDiffPixels.toLocaleString()} pixels</span>`;
+                    info.innerHTML =
+                        `<span class="status-success">✅ Diferenças detectadas: ${data.numDiffPixels.toLocaleString()} pixels</span>`;
                     diffImage.src = data.diffUrl + "?t=" + Date.now();
                 } else {
                     info.innerHTML = `<span class="status-error">❌ Erro: ${data.error}</span>`;
                 }
             } catch (err) {
-                info.innerHTML = `<span class="status-error">❌ Erro ao comparar: ${err.message}</span>`;
+                if (err.name === 'AbortError') {
+                    info.innerHTML =
+                        `<span class="status-warning">⏹️ Comparação cancelada pelo usuário</span>`;
+                } else {
+                    info.innerHTML = `<span class="status-error">❌ Erro ao comparar: ${err.message}</span>`;
+                }
+            } finally {
+                compareBtn.disabled = false;
+                cancelBtn.style.display = "none";
+                compareController = null;
+            }
+        });
+
+        // 🔥 BOTÃO CANCELAR COMPARAÇÃO
+        document.getElementById("cancelCompareBtn").addEventListener("click", () => {
+            if (compareController) {
+                compareController.abort();
             }
         });
 
@@ -348,22 +393,30 @@
             const baseUrl1 = document.getElementById("baseUrl1").value;
             const baseUrl2 = document.getElementById("baseUrl2").value;
             const maxPages = document.getElementById("maxPages").value;
-            
+
             const fullSiteInfo = document.getElementById("fullSiteInfo");
             const fullSiteResults = document.getElementById("fullSiteResults");
             const fullSiteResult = document.getElementById("fullSiteResult");
             const fullSiteProgress = document.getElementById("fullSiteProgress");
+            const fullSiteBtn = document.getElementById("compareFullSiteBtn");
+            const cancelBtn = document.getElementById("cancelFullSiteBtn");
 
             if (!baseUrl1 || !baseUrl2) {
                 alert("Por favor, preencha ambas as URLs base");
                 return;
             }
 
+            // 🔥 Cria novo AbortController
+            fullSiteController = new AbortController();
+
+            fullSiteBtn.disabled = true;
+            cancelBtn.style.display = "block";
             fullSiteInfo.innerHTML = `
-                <p><div class="loading"></div> 🕷️ Iniciando crawling em ambos os sites...</p>
-                <p>🔍 Isso pode levar vários minutos para sites grandes</p>
-                <p><small>O sistema vai descobrir e comparar TODAS as páginas automaticamente</small></p>
-            `;
+        <p><div class="loading"></div> 🕷️ Iniciando crawling em ambos os sites...</p>
+        <p>🔍 Isso pode levar vários minutos para sites grandes</p>
+        <p><small>O sistema vai descobrir e comparar TODAS as páginas automaticamente</small></p>
+        <p><small>⚠️ Clique em "Cancelar Crawling" para interromper</small></p>
+    `;
             fullSiteResult.style.display = "block";
             fullSiteResults.innerHTML = "";
             fullSiteProgress.style.width = "0%";
@@ -371,72 +424,93 @@
             try {
                 const res = await fetch("/compare-full-site", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ 
-                        baseUrl1, 
-                        baseUrl2, 
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        baseUrl1,
+                        baseUrl2,
                         maxPages: maxPages === "0" ? 100 : parseInt(maxPages)
-                    })
+                    }),
+                    signal: fullSiteController.signal // 🔥 Conecta o abort signal
                 });
 
                 const data = await res.json();
 
                 if (data.success) {
                     fullSiteInfo.innerHTML = `
-                        <p class="status-success">✅ <strong>Crawling completo!</strong></p>
-                        <p>📊 ${data.totalPagesFound} páginas encontradas</p>
-                        <p>🔍 ${data.totalCompared} páginas comparadas</p>
-                        <p><small>Ordenado por páginas com mais diferenças primeiro</small></p>
-                    `;
-                    
-                    // Ordena por número de diferenças (maiores primeiro)
+                <p class="status-success">✅ <strong>Crawling completo!</strong></p>
+                <p>📊 ${data.totalPagesFound} páginas encontradas</p>
+                <p>🔍 ${data.totalCompared} páginas comparadas</p>
+                <p><small>Ordenado por páginas com mais diferenças primeiro</small></p>
+            `;
+
                     const sortedResults = data.results.sort((a, b) => {
                         if (a.error && !b.error) return 1;
                         if (!a.error && b.error) return -1;
                         if (a.error && b.error) return 0;
                         return (b.numDiffPixels || 0) - (a.numDiffPixels || 0);
                     });
-                    
+
                     sortedResults.forEach((result, index) => {
                         const resultDiv = document.createElement("div");
                         resultDiv.className = "result-item";
-                        
+
                         if (result.error) {
                             resultDiv.innerHTML = `
-                                <h4>❌ ${result.name}</h4>
-                                <p><strong>URL 1:</strong> <a href="${result.url1}" target="_blank">${result.url1}</a></p>
-                                <p><strong>URL 2:</strong> <a href="${result.url2}" target="_blank">${result.url2}</a></p>
-                                <p class="status-error"><strong>Erro:</strong> ${result.error}</p>
-                            `;
+                        <h4>❌ ${result.name}</h4>
+                        <p><strong>URL 1:</strong> <a href="${result.url1}" target="_blank">${result.url1}</a></p>
+                        <p><strong>URL 2:</strong> <a href="${result.url2}" target="_blank">${result.url2}</a></p>
+                        <p class="status-error"><strong>Erro:</strong> ${result.error}</p>
+                    `;
                         } else {
-                            const status = result.numDiffPixels > 1000 ? '🔴 CRÍTICO' : 
-                                          result.numDiffPixels > 100 ? '🟡 ALERTA' : '🟢 OK';
-                            const statusClass = result.numDiffPixels > 1000 ? 'status-error' : 
-                                              result.numDiffPixels > 100 ? 'status-warning' : 'status-success';
-                            
+                            const status = result.numDiffPixels > 1000 ? '🔴 CRÍTICO' :
+                                result.numDiffPixels > 100 ? '🟡 ALERTA' : '🟢 OK';
+                            const statusClass = result.numDiffPixels > 1000 ? 'status-error' :
+                                result.numDiffPixels > 100 ? 'status-warning' : 'status-success';
+
                             resultDiv.innerHTML = `
-                                <h4>${result.numDiffPixels > 1000 ? '🔴' : result.numDiffPixels > 100 ? '🟡' : '🟢'} ${result.name}</h4>
-                                <p><strong>Status:</strong> <span class="${statusClass}">${status}</span></p>
-                                <p><strong>URL 1:</strong> <a href="${result.url1}" target="_blank">${result.url1}</a></p>
-                                <p><strong>URL 2:</strong> <a href="${result.url2}" target="_blank">${result.url2}</a></p>
-                                <p><strong>Diferenças:</strong> ${result.numDiffPixels.toLocaleString()} pixels</p>
-                                ${result.numDiffPixels > 100 ? 
-                                  `<img src="${result.diffUrl}?t=${Date.now()}" alt="Diff" class="diff-image">` : 
-                                  '<p class="status-success">✅ Poucas diferenças detectadas</p>'
-                                }
-                            `;
+                        <h4>${result.numDiffPixels > 1000 ? '🔴' : result.numDiffPixels > 100 ? '🟡' : '🟢'} ${result.name}</h4>
+                        <p><strong>Status:</strong> <span class="${statusClass}">${status}</span></p>
+                        <p><strong>URL 1:</strong> <a href="${result.url1}" target="_blank">${result.url1}</a></p>
+                        <p><strong>URL 2:</strong> <a href="${result.url2}" target="_blank">${result.url2}</a></p>
+                        <p><strong>Diferenças:</strong> ${result.numDiffPixels.toLocaleString()} pixels</p>
+                        ${result.numDiffPixels > 100 ? 
+                          `<img src="${result.diffUrl}?t=${Date.now()}" alt="Diff" class="diff-image">` : 
+                          '<p class="status-success">✅ Poucas diferenças detectadas</p>'
                         }
-                        
+                    `;
+                        }
+
                         fullSiteResults.appendChild(resultDiv);
-                        fullSiteProgress.style.width = `${((index + 1) / sortedResults.length) * 100}%`;
+                        fullSiteProgress.style.width =
+                            `${((index + 1) / sortedResults.length) * 100}%`;
                     });
                 } else {
                     fullSiteInfo.innerHTML = `<p class="status-error">❌ Erro: ${data.error}</p>`;
                 }
             } catch (err) {
-                fullSiteInfo.innerHTML = `<p class="status-error">❌ Erro ao comparar: ${err.message}</p>`;
+                if (err.name === 'AbortError') {
+                    fullSiteInfo.innerHTML =
+                        `<p class="status-warning">⏹️ Crawling cancelado pelo usuário</p>`;
+                } else {
+                    fullSiteInfo.innerHTML =
+                        `<p class="status-error">❌ Erro ao comparar: ${err.message}</p>`;
+                }
+            } finally {
+                fullSiteBtn.disabled = false;
+                cancelBtn.style.display = "none";
+                fullSiteController = null;
+            }
+        });
+
+        // 🔥 BOTÃO CANCELAR CRAWLING
+        document.getElementById("cancelFullSiteBtn").addEventListener("click", () => {
+            if (fullSiteController) {
+                fullSiteController.abort();
             }
         });
     </script>
 </body>
+
 </html>
