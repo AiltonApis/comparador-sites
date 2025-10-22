@@ -204,6 +204,26 @@ function compareImages(img1Path, img2Path) {
     };
 }
 
+// 🎯 HEALTH CHECK - Rota raiz para Railway
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Comparador de Sites Online',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ... (seu código existente)
+
+// 🎯 HEALTH CHECK para Railway
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy',
+    service: 'comparador-sites',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // 🎯 ROTA DE COMPARAÇÃO SIMPLES
 app.post("/compare", async (req, res) => {
     // Limpa imagens antigas
